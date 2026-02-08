@@ -1,9 +1,11 @@
+import crypto from 'crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '../generated/prisma';
 import { PrismaScanRepository } from '../core/repository';
 import { RugShieldService } from '../core/service';
 import { ApiKeyTier } from '../core/types';
+import { logError, logInfo } from '../utils/logger';
 
 function parseApiKey(req: express.Request): string | undefined {
   const header = req.header('x-api-key');
@@ -40,6 +42,23 @@ function parsePeriod(req: express.Request): { start: Date; end: Date } {
   return { start, end };
 }
 
+function getRequestId(req: express.Request): string {
+  return String(resquestIdFromReq(req) || crypto.randomUUID());
+}
+
+function resquestIdFromReq(req: express.Request): string | undefined {
+  const header = req.header('x-request-id');
+  return header?.trim() || undefined;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
+}
+
+function sendError(res: express.Response, status: number, requestId: string, error: unknown): void {
+  res.status(status).json({ error: errorMessage(error), requestId });
+}
+
 export function createApp(service?: RugShieldService): express.Express {
   const app = express();
   const prisma = new PrismaClient();
@@ -47,6 +66,25 @@ export function createApp(service?: RugShieldService): express.Express {
   const rugShieldService = service || new RugShieldService(repository, repository);
 
   app.use(express.json({ limit: '1mb' }));
+  app.use((req, res, next) => {
+    const requestId = getRequestId(req);
+    res.locals.requestId = requestId;
+    res.setHeader('x-request-id', requestId);
+
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      logInfo('http_request', {
+        requestId,
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
+    });
+
+    next();
+  });
+
   app.use(
     '/api/',
     rateLimit({
@@ -61,27 +99,40 @@ export function createApp(service?: RugShieldService): express.Express {
     res.json({ status: 'ok', service: 'rugshield', time: new Date().toISOString() });
   });
 
+  app.get('/ready', async (_req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ready', service: 'rugshield', requestId, time: new Date().toISOString() });
+    } catch (error) {
+      logError('readiness_check_failed', { requestId, error: errorMessage(error) });
+      sendError(res, 503, requestId, 'Database connection unavailable.');
+    }
+  });
+
   app.get('/api/v1/meta', (_req, res) => {
     res.json({
       name: 'RugShield',
       chainPriority: ['sui', 'evm', 'solana'],
       defaultChain: 'sui',
-      version: '0.4.0',
+      version: '0.5.0',
     });
   });
 
   app.post('/api/v1/analyze', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     try {
       const { chain, targetType = 'address', targetValue, sourceCode } = req.body || {};
       if (targetType !== 'address' && targetType !== 'source') {
-        res.status(400).json({ error: 'targetType must be address or source.' });
+        sendError(res, 400, requestId, 'targetType must be address or source.');
         return;
       }
 
       const rawApiKey = parseApiKey(req);
       const apiKey = rawApiKey ? await rugShieldService.authenticateApiKey(rawApiKey) : null;
       if (rawApiKey && !apiKey) {
-        res.status(401).json({ error: 'Invalid or inactive API key.' });
+        sendError(res, 401, requestId, 'Invalid or inactive API key.');
         return;
       }
 
@@ -98,78 +149,93 @@ export function createApp(service?: RugShieldService): express.Express {
         });
       }
 
-      res.status(201).json({ scan });
+      res.status(201).json({ scan, requestId });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = errorMessage(error);
       if (message.includes('Daily quota exceeded')) {
-        res.status(429).json({ error: message });
+        sendError(res, 429, requestId, message);
         return;
       }
-      res.status(400).json({ error: message });
+
+      logError('analyze_failed', { requestId, message });
+      sendError(res, 400, requestId, message);
     }
   });
 
   app.get('/api/v1/keys/me', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     try {
       const apiKey = parseApiKey(req);
       if (!apiKey) {
-        res.status(401).json({ error: 'API key required.' });
+        sendError(res, 401, requestId, 'API key required.');
         return;
       }
 
       const status = await rugShieldService.getApiKeyStatus(apiKey);
-      res.json({ status });
+      res.json({ status, requestId });
     } catch (error) {
-      res.status(401).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 401, requestId, error);
     }
   });
 
   app.post('/api/v1/keys/rotate', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     try {
       const apiKey = parseApiKey(req);
       if (!apiKey) {
-        res.status(401).json({ error: 'API key required.' });
+        sendError(res, 401, requestId, 'API key required.');
         return;
       }
 
-      const next = await rugShieldService.rotateApiKey(apiKey, req.body?.name ? String(req.body.name) : undefined);
-      res.status(201).json({ apiKey: next });
+      const next = await rugShieldService.rotateApiKey(
+        apiKey,
+        req.body?.name ? String(req.body.name) : undefined,
+      );
+      res.status(201).json({ apiKey: next, requestId });
     } catch (error) {
-      res.status(401).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 401, requestId, error);
     }
   });
 
   app.get('/api/v1/scans/:id', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     const scan = await rugShieldService.getScan(req.params.id);
     if (!scan) {
-      res.status(404).json({ error: 'Scan not found.' });
+      sendError(res, 404, requestId, 'Scan not found.');
       return;
     }
-    res.json({ scan });
+    res.json({ scan, requestId });
   });
 
   app.get('/api/v1/scans', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     try {
       const chain = req.query.chain ? String(req.query.chain) : undefined;
       const targetValue = req.query.targetValue ? String(req.query.targetValue) : undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
       const scans = await rugShieldService.listScans({ chain, targetValue, limit });
-      res.json({ scans });
+      res.json({ scans, requestId });
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 400, requestId, error);
     }
   });
 
   app.post('/api/v1/admin/keys', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     if (!isAdminRequest(req)) {
-      res.status(403).json({ error: 'Forbidden.' });
+      sendError(res, 403, requestId, 'Forbidden.');
       return;
     }
 
     try {
       const tier = parseTier(req.body?.tier);
       if (!tier) {
-        res.status(400).json({ error: 'tier must be one of: free, pro, api.' });
+        sendError(res, 400, requestId, 'tier must be one of: free, pro, api.');
         return;
       }
 
@@ -177,47 +243,53 @@ export function createApp(service?: RugShieldService): express.Express {
         name: String(req.body?.name || ''),
         tier,
       });
-      res.status(201).json({ apiKey: created });
+      res.status(201).json({ apiKey: created, requestId });
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 400, requestId, error);
     }
   });
 
   app.get('/api/v1/admin/keys', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     if (!isAdminRequest(req)) {
-      res.status(403).json({ error: 'Forbidden.' });
+      sendError(res, 403, requestId, 'Forbidden.');
       return;
     }
 
     try {
       const keys = await rugShieldService.listApiKeys();
-      res.json({ keys });
+      res.json({ keys, requestId });
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 400, requestId, error);
     }
   });
 
   app.delete('/api/v1/admin/keys/:id', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     if (!isAdminRequest(req)) {
-      res.status(403).json({ error: 'Forbidden.' });
+      sendError(res, 403, requestId, 'Forbidden.');
       return;
     }
 
     try {
       const revoked = await rugShieldService.revokeApiKey(req.params.id);
       if (!revoked) {
-        res.status(404).json({ error: 'API key not found or already revoked.' });
+        sendError(res, 404, requestId, 'API key not found or already revoked.');
         return;
       }
       res.status(204).send();
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 400, requestId, error);
     }
   });
 
   app.get('/api/v1/admin/reports/usage', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     if (!isAdminRequest(req)) {
-      res.status(403).json({ error: 'Forbidden.' });
+      sendError(res, 403, requestId, 'Forbidden.');
       return;
     }
 
@@ -225,30 +297,32 @@ export function createApp(service?: RugShieldService): express.Express {
       const period = parsePeriod(req);
       const rawTier = req.query.tier ? parseTier(String(req.query.tier)) : null;
       if (req.query.tier && !rawTier) {
-        res.status(400).json({ error: 'tier must be one of: free, pro, api.' });
+        sendError(res, 400, requestId, 'tier must be one of: free, pro, api.');
         return;
       }
       const tier = rawTier || undefined;
 
       const report = await rugShieldService.getUsageSummary({ ...period, tier });
-      res.json({ period, report });
+      res.json({ period, report, requestId });
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 400, requestId, error);
     }
   });
 
   app.get('/api/v1/admin/reports/invoice', async (req, res) => {
+    const requestId = String(res.locals.requestId || crypto.randomUUID());
+
     if (!isAdminRequest(req)) {
-      res.status(403).json({ error: 'Forbidden.' });
+      sendError(res, 403, requestId, 'Forbidden.');
       return;
     }
 
     try {
       const period = parsePeriod(req);
       const invoice = await rugShieldService.getInvoiceReport(period);
-      res.json({ invoice });
+      res.json({ invoice, requestId });
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendError(res, 400, requestId, error);
     }
   });
 

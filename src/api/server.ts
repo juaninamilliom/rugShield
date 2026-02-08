@@ -1,9 +1,9 @@
 import { createApp } from './app';
+import { logInfo } from '../utils/logger';
 
 const port = Number(process.env.PORT || 3400);
 const app = createApp();
 
 app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`RugShield API listening on :${port}`);
+  logInfo('server_started', { service: 'rugshield', port });
 });

@@ -43,6 +43,7 @@ Required `DATABASE_URL`:
 ```env
 DATABASE_URL=postgresql://rugshield:rugshield@localhost:5434/rugshield?schema=public
 RATE_LIMIT_PER_MINUTE=60
+LOG_LEVEL=info
 PORT=3400
 SUI_RPC_URL=https://fullnode.mainnet.sui.io:443
 ETHERSCAN_API_KEY=
@@ -68,6 +69,7 @@ npm run start:api
 
 ```bash
 curl -sS http://localhost:3400/health
+curl -sS http://localhost:3400/ready
 ```
 
 ## API
@@ -170,16 +172,18 @@ Implemented now:
 - persisted scan history in Postgres
 - deterministic chain-specific risk checks
 - API request throttling
+- API key issuance, rotation, and revocation
+- tier quotas + usage metering + invoice-ready reporting
 - containerized runtime
+- structured request logging + request-id propagation + readiness probe
 - unit + integration tests
 
 Next production layers (tracked in `IMPLEMENTATION-PLAN.md`):
 
-- authenticated API keys + metering
-- billing entitlements
 - background queues and retries
 - richer explorer/indexer source retrieval
 - observability dashboards and alert routing
+- external payment rail integration for invoice settlement
 
 ## License
 

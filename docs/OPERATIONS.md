@@ -60,6 +60,12 @@ Recommended chain coverage:
 3. p95 analyze latency target: `< 30s`.
 4. Incident acknowledge SLA: `< 15 minutes` during business hours.
 
+## 4.1 Health and Readiness Probes
+
+1. Liveness: `GET /health` (service process alive).
+2. Readiness: `GET /ready` (process + database connectivity).
+3. API responses include `x-request-id`; capture this in support/incident tickets.
+
 ## 5. Incident Workflow
 
 1. Detect (health check / alerts / customer report).
