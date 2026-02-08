@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rugshield-postgres
+    environment:
+      POSTGRES_DB: rugshield
+      POSTGRES_USER: rugshield
+      POSTGRES_PASSWORD: rugshield
+    ports:
+      - "5434:5432"
+    volumes:
+      - rugshield_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rugshield -d rugshield"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rugshield-app
+    environment:
+      NODE_ENV: production
+      PORT: 3400
+      DATABASE_URL: postgresql://rugshield:rugshield@db:5432/rugshield?schema=public
+      RATE_LIMIT_PER_MINUTE: 60
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3400:3400"
+
+volumes:
+  rugshield_pgdata:

@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Scan {
+  id                String   @id @default(cuid())
+  chain             String
+  targetType        String
+  targetValue       String
+  score             Int
+  riskLevel         String
+  findingsJson      String
+  summary           String
+  aiModel           String
+  analysisTimeMs    Int
+  sourceCodeHash    String?
+  createdAt         DateTime @default(now())
+
+  @@index([chain, targetValue, createdAt])
+}
+
+model ApiKey {
+  id          String      @id @default(cuid())
+  name        String
+  tier        String
+  keyHash     String      @unique
+  keyPrefix   String      @unique
+  active      Boolean     @default(true)
+  usageCount  Int         @default(0)
+  lastUsedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  usages      ApiKeyUsage[]
+
+  @@index([tier, active, createdAt])
+}
+
+model ApiKeyUsage {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  endpoint     String
+  chain        String?
+  requestUnits Int      @default(1)
+  createdAt    DateTime @default(now())
+  apiKey       ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+}
