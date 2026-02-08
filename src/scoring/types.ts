@@ -29,6 +29,9 @@ export interface ChainAnalysisArtifact {
     compiler?: string;
     verifiedSource: boolean;
     fetchedAt: number;
+    providerHealthy?: boolean;
+    degradedModeReason?: string;
+    retryAttempts?: number;
   };
 }
 

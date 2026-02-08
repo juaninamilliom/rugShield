@@ -66,6 +66,12 @@ Recommended chain coverage:
 2. Readiness: `GET /ready` (process + database connectivity).
 3. API responses include `x-request-id`; capture this in support/incident tickets.
 
+## 4.2 Provider Resilience Controls
+
+1. Configure provider timeout via `PROVIDER_TIMEOUT_MS`.
+2. Configure retry behavior via `PROVIDER_RETRY_ATTEMPTS` and `PROVIDER_RETRY_DELAY_MS`.
+3. On provider degradation, RugShield continues in fallback mode and records degraded metadata in chain artifacts.
+
 ## 5. Incident Workflow
 
 1. Detect (health check / alerts / customer report).

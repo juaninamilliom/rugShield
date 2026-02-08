@@ -44,6 +44,9 @@ Required `DATABASE_URL`:
 DATABASE_URL=postgresql://rugshield:rugshield@localhost:5434/rugshield?schema=public
 RATE_LIMIT_PER_MINUTE=60
 LOG_LEVEL=info
+PROVIDER_TIMEOUT_MS=4000
+PROVIDER_RETRY_ATTEMPTS=3
+PROVIDER_RETRY_DELAY_MS=200
 PORT=3400
 SUI_RPC_URL=https://fullnode.mainnet.sui.io:443
 ETHERSCAN_API_KEY=
@@ -176,6 +179,7 @@ Implemented now:
 - tier quotas + usage metering + invoice-ready reporting
 - containerized runtime
 - structured request logging + request-id propagation + readiness probe
+- provider resilience via retries/timeouts with degraded-mode fallback metadata
 - unit + integration tests
 
 Next production layers (tracked in `IMPLEMENTATION-PLAN.md`):
