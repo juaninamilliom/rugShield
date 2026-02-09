@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import express from 'express';
+import path from 'path';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '../generated/prisma';
 import { PrismaScanRepository } from '../core/repository';
@@ -64,6 +65,7 @@ export function createApp(service?: RugShieldService): express.Express {
   const prisma = new PrismaClient();
   const repository = new PrismaScanRepository(prisma);
   const rugShieldService = service || new RugShieldService(repository, repository);
+  const publicDir = path.resolve(process.cwd(), 'public');
 
   app.use(express.json({ limit: '1mb' }));
   app.use((req, res, next) => {
@@ -94,6 +96,11 @@ export function createApp(service?: RugShieldService): express.Express {
       legacyHeaders: false,
     }),
   );
+
+  app.use(express.static(publicDir));
+  app.get('/', (_req, res) => {
+    res.sendFile(path.join(publicDir, 'index.html'));
+  });
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'rugshield', time: new Date().toISOString() });

@@ -41,7 +41,7 @@ cp .env.example .env
 Required `DATABASE_URL`:
 
 ```env
-DATABASE_URL=postgresql://rugshield:rugshield@localhost:5434/rugshield?schema=public
+DATABASE_URL=postgresql://rugshield:rugshield@localhost:5435/rugshield?schema=public
 RATE_LIMIT_PER_MINUTE=60
 LOG_LEVEL=info
 PROVIDER_TIMEOUT_MS=4000
@@ -155,8 +155,8 @@ ALLOW_HTTP_TESTS=1 npm test
 DB integration requires:
 
 1. `docker compose up -d db`
-2. `DATABASE_URL=postgresql://rugshield:rugshield@127.0.0.1:5434/rugshield?schema=public npm run prisma:migrate:deploy`
-3. `DATABASE_URL=postgresql://rugshield:rugshield@127.0.0.1:5434/rugshield?schema=public npm run test:db`
+2. `DATABASE_URL=postgresql://rugshield:rugshield@127.0.0.1:5435/rugshield?schema=public npm run prisma:migrate:deploy`
+3. `DATABASE_URL=postgresql://rugshield:rugshield@127.0.0.1:5435/rugshield?schema=public npm run test:db`
 
 ## Docker (App + DB)
 
@@ -165,7 +165,7 @@ docker compose up --build
 ```
 
 - App: `http://localhost:3400`
-- DB: `localhost:5434`
+- DB: `localhost:5435`
 
 ## Production Readiness Notes
 

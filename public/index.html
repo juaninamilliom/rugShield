@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RugShield Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <main class="layout">
+      <section class="hero card">
+        <div>
+          <p class="eyebrow">RugShield</p>
+          <h1>Is this token safe?</h1>
+          <p class="muted">
+            Before you buy a token, connect to a dApp, or approve a transaction — paste the address here.
+            RugShield checks for scam patterns, honeypots, and whether the creator has a trustworthy history.
+          </p>
+        </div>
+        <div class="pill-row">
+          <span class="pill">Sui</span>
+          <span class="pill">Ethereum & EVM</span>
+          <span class="pill">Solana</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Check a Token or dApp</h2>
+          <div class="help-box">
+            <p><strong>What does this do?</strong></p>
+            <p>Every token you trade and every dApp you connect to runs on code that lives on the blockchain. That code can be written to steal your funds (rug pull), prevent you from selling (honeypot), or drain your wallet when you approve a transaction.</p>
+            <p>Paste the token or dApp address below and we'll scan that code for red flags and check whether the person who created it is legit.</p>
+          </div>
+          <form id="analyze-form" class="stack">
+            <label>
+              Which blockchain?
+              <select id="chain" name="chain">
+                <option value="sui">Sui</option>
+                <option value="evm">Ethereum / EVM (Polygon, Arbitrum, Base, etc.)</option>
+                <option value="solana">Solana</option>
+              </select>
+            </label>
+            <p class="hint">Pick the chain where you found this token or dApp.</p>
+
+            <label>
+              What are you checking?
+              <select id="targetType" name="targetType">
+                <option value="address">A token or dApp address (most common)</option>
+                <option value="source">I have the source code (developers only)</option>
+              </select>
+            </label>
+            <p class="hint">Almost always pick the first option. You only need "source code" if you're a developer reviewing code directly.</p>
+
+            <label>
+              Paste the address
+              <input id="targetValue" name="targetValue" placeholder="Paste the token or dApp address here" required />
+            </label>
+            <p class="hint" id="target-hint">
+              This is the long string of letters and numbers that identifies a token or dApp. You can find it:
+            </p>
+            <ul class="hint-list">
+              <li>On any DEX — look at the URL or token info page when viewing a token</li>
+              <li>On a block explorer like Etherscan, SuiScan, or Solscan — it's in the URL bar</li>
+              <li>In your wallet — tap a token, then look for "contract address" or "token address"</li>
+              <li>If someone sent you a link to buy a token — the address is usually in that link</li>
+            </ul>
+
+            <label>
+              API Key (optional)
+              <input id="apiKey" name="apiKey" placeholder="Leave blank — you don't need one" />
+            </label>
+            <p class="hint">Free to use. An API key just gives you more scans per minute.</p>
+
+            <button type="submit">Check If It's Safe</button>
+          </form>
+          <pre id="analyze-result" class="result">Results will appear here after you submit.</pre>
+        </article>
+
+        <article class="card">
+          <h2>Your API Key</h2>
+          <p class="hint" style="margin-bottom:12px">If you have an API key, you can check how many scans you've used or generate a new key. Enter your key in the form on the left first.</p>
+          <div class="stack">
+            <button id="key-status-btn" type="button">Check My Key Status</button>
+            <button id="key-rotate-btn" type="button">Get a New Key</button>
+          </div>
+          <pre id="key-result" class="result">Key info appears here.</pre>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Admin Usage Report</h2>
+          <p class="hint" style="margin-bottom:12px">Admin-only. View scan counts and API usage broken down by tier and time period.</p>
+          <form id="usage-form" class="stack compact">
+            <label>
+              Admin Token
+              <input id="adminToken" placeholder="Server-side admin token" required />
+            </label>
+            <p class="hint">Set via <code>ADMIN_TOKEN</code> env var on the server.</p>
+            <label>
+              Start Date
+              <input id="usageStart" type="datetime-local" />
+            </label>
+            <label>
+              End Date
+              <input id="usageEnd" type="datetime-local" />
+            </label>
+            <p class="hint">Leave blank for all-time.</p>
+            <label>
+              Tier (optional)
+              <select id="usageTier">
+                <option value="">all</option>
+                <option value="free">free</option>
+                <option value="pro">pro</option>
+                <option value="api">api</option>
+              </select>
+            </label>
+            <p class="hint">Filter results to a specific API key tier.</p>
+            <button type="submit">Load Usage Report</button>
+          </form>
+          <pre id="usage-result" class="result">Usage report appears here.</pre>
+        </article>
+
+        <article class="card">
+          <h2>Admin Invoice Report</h2>
+          <p class="hint" style="margin-bottom:12px">Admin-only. Generate a billing summary for a date range. Requires admin token from the Usage Report form above.</p>
+          <form id="invoice-form" class="stack compact">
+            <label>
+              Start Date
+              <input id="invoiceStart" type="datetime-local" />
+            </label>
+            <label>
+              End Date
+              <input id="invoiceEnd" type="datetime-local" />
+            </label>
+            <p class="hint">Select the billing period.</p>
+            <button type="submit">Load Invoice Report</button>
+          </form>
+          <pre id="invoice-result" class="result">Invoice report appears here.</pre>
+        </article>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

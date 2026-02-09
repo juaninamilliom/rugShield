@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: rugshield
       POSTGRES_PASSWORD: rugshield
     ports:
-      - "5434:5432"
+      - "5435:5432"
     volumes:
       - rugshield_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -31,6 +31,7 @@ services:
         condition: service_healthy
     ports:
       - "3400:3400"
+    command: sh -c "npm run prisma:migrate:deploy && npm run start:api"
 
 volumes:
   rugshield_pgdata:
